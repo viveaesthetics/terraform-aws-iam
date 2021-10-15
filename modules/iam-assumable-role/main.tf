@@ -46,6 +46,35 @@ data "aws_iam_policy_document" "assume_role_with_mfa" {
   }
 }
 
+data "aws_iam_policy_document" "assume_role_with_saml" {
+  statement {
+    effect = "Allow"
+
+    actions = ["sts:AssumeRoleWithSAML"]
+    
+    principals {
+      type        = "Federated"
+      identifiers = [var.provider_id]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "SAML:aud"
+      values   = [var.aws_saml_endpoint]
+    }
+  }
+}
+
+
+data "aws_iam_policy_document" "merged_policy_docs" {
+
+  source_policy_documents = [
+                 data.aws_iam_policy_document.assume_role.json,
+                 data.aws_iam_policy_document.assume_role_with_saml.json
+                ]
+}
+
+
 resource "aws_iam_role" "this" {
   count = var.create_role ? 1 : 0
 
@@ -55,7 +84,7 @@ resource "aws_iam_role" "this" {
 
   permissions_boundary = var.role_permissions_boundary_arn
 
-  assume_role_policy = var.role_requires_mfa ? data.aws_iam_policy_document.assume_role_with_mfa.json : data.aws_iam_policy_document.assume_role.json
+  assume_role_policy = var.role_requires_mfa ? data.aws_iam_policy_document.assume_role_with_mfa.json : data.aws_iam_policy_document.merged_policy_docs.json
 
   tags = var.tags
 }
